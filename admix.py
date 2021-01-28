@@ -47,13 +47,44 @@ def tractor(pheno, anc, geno, theta):
     base_design = np.hstack([sm.add_constant(anc), theta[:, np.newaxis]])
     tractor_design = np.hstack([base_design, geno])
     
-#     base_model = sm.Logit(pheno, base_design).fit(disp=0, method="bfgs", maxiter=100)
-#     tractor_model = sm.Logit(pheno, tractor_design).fit(disp=0, method="bfgs", maxiter=100)
-    base_model = sm.Logit(pheno, base_design).fit(disp=0, method="bfgs", maxiter=200)
-    tractor_model = sm.Logit(pheno, tractor_design).fit(disp=0, method="bfgs", maxiter=200)
+    # start with nm, then use bfgs
+    base_model = sm.Logit(pheno, base_design).fit(disp=0, method="nm", maxiter=200)
+    base_model = sm.Logit(pheno, base_design).fit(disp=0, method="bfgs", maxiter=200, start_params=base_model.params)
+    
+    # use starting parameter from base_model
+    tractor_model = sm.Logit(pheno, tractor_design).fit(disp=0, method="bfgs", maxiter=200,
+                                                        start_params=np.concatenate([base_model.params, [0., 0.]]))
     lr_stat = -2 * (base_model.llf - tractor_model.llf)
-    return lr_stat 
+    
+    return stats.chi2.sf(lr_stat, 2)
 
+def tractor_multi_snp(pheno, phgeno, anc, theta):
+    """
+    A convenient function for fitting multiple SNPs with the tractor model
+    Args
+    -----
+    pheno: (n_indiv, ) phenotypes
+    phgeno: (n_indiv, 2xn_snp) phased genotype
+    anc: (n_indiv, 2xn_snp) local ancestry
+    theta: (n_indiv, ) global ancestry
+    
+    Returns
+    -----
+    (n_snp, ) p-value
+    """
+    n_indiv = len(pheno)
+    n_snp = phgeno.shape[1] // 2
+    t_geno = convert_anc_count(anc=anc, phgeno=phgeno)
+    t_anc = add_up_haplotype(anc)
+    pval_list = np.zeros(n_snp)
+    for snp_i in range(n_snp):
+        pval = tractor(pheno=pheno,
+                       anc=t_anc[:, snp_i], 
+                       geno=t_geno[:, [snp_i, n_snp + snp_i]], 
+                       theta=theta)
+        pval_list[snp_i] = pval
+    
+    return pval_list
 
 def sample_case_control(pheno, ratio=1):
     """
@@ -163,7 +194,43 @@ def convert_anc_count(phgeno, anc):
                 geno[indiv_i, anc_snp_index + anc_i * n_snp] += phgeno[haplo_i, anc_snp_index]
     return geno
 
-def simulate_phenotype_cc(phgeno, anc, var_g, case_prevalence=0.1, n_causal=1, cov = 0., n_sim=30, seed=1234):
+def convert_anc_count2(phgeno, anc):
+    """
+    Convert from ancestry and phased genotype to number of minor alles for each ancestry
+    version 2, it should lead to exact the same results as `convert_anc_count`
+
+    anc = np.random.randint(0, 2, size=(10, 6))
+    phgeno = np.random.randint(0, 2, size=(10, 6))
+    count1 = admix.convert_anc_count(phgeno=phgeno, anc=anc)
+    count2 = convert_anc_count2(phgeno = phgeno, anc=anc)
+    assert np.all(count1 == count2)
+
+    Args
+    ----
+    phgeno: n_indiv x 2n_snp, the first half columns contain the first haplotype,
+        the second half columns contain the second haplotype
+    anc: n_indiv x 2n_snp, match `phgeno`
+
+    Returns
+    ----
+    geno: n_indiv x 2n_snp, the first half columns stores the number of minor alleles 
+        from the first ancestry, the second half columns stores the number of minor
+        alleles from the second ancestry
+    """
+    n_indiv = anc.shape[0]
+    n_snp = anc.shape[1] // 2
+    n_anc = 2
+    geno = np.zeros_like(phgeno)
+    for haplo_i in range(2):
+        haplo_slice = slice(haplo_i * n_snp, (haplo_i + 1) * n_snp)
+        haplo_phgeno = phgeno[:, haplo_slice]
+        haplo_anc = anc[:, haplo_slice]
+        for anc_i in range(n_anc):
+            geno[:, (anc_i * n_snp) : ((anc_i + 1) * n_snp)][haplo_anc == anc_i] += haplo_phgeno[haplo_anc == anc_i]
+
+    return geno
+
+def simulate_phenotype_cc(phgeno, anc, var_g, case_prevalence=0.1, n_causal=1, cov = 0., n_sim=30):
 
     """
     Simulate case control phenotype for admixture population 
@@ -182,7 +249,6 @@ def simulate_phenotype_cc(phgeno, anc, var_g, case_prevalence=0.1, n_causal=1, c
     beta: (2 * n_snp, n_sim) matrix
     phe: (n_indiv, n_sim) matrix
     """
-    np.random.seed(seed)
 
     # phgeno
     # [0 1 0 | 1 1 0]
@@ -245,7 +311,7 @@ def simulate_phenotype_cc_1snp(phgeno, anc, var_g, cov=0.0, n_sim=10, case_preva
         return_list.append((beta, phe_g, phe))
     return return_list
 
-def simulate_admix_phenotype_cont(phgeno, anc, h2g, n_causal, cov = 0., n_sim=30, seed=1234):
+def simulate_admix_phenotype_cont(phgeno, anc, h2g, n_causal, cov = 0., n_sim=30):
     """
     Simulate phenotype for admixture population [continuous]
 
@@ -264,7 +330,6 @@ def simulate_admix_phenotype_cont(phgeno, anc, h2g, n_causal, cov = 0., n_sim=30
     phe: (n_indiv, n_sim) matrix
     """
 
-    np.random.seed(seed)
     geno = convert_anc_count(phgeno, anc)
     n_snp = geno.shape[1] // 2
 
@@ -291,7 +356,7 @@ def simulate_admix_phenotype_cont(phgeno, anc, h2g, n_causal, cov = 0., n_sim=30
     return beta, phe_g, phe
 
 @deprecated
-def deprecated_simulate_phenotype_admix(anc, haplo, h2g, n_causal, cov = 0., n_sim=30, seed=1234):
+def deprecated_simulate_phenotype_admix(anc, haplo, h2g, n_causal, cov = 0., n_sim=30):
     """
     Simulate phenotype for admixture population
     # Args
@@ -308,7 +373,6 @@ def deprecated_simulate_phenotype_admix(anc, haplo, h2g, n_causal, cov = 0., n_s
     beta: (2 * n_snp, n_sim) matrix
     phe: (n_indiv, n_sim) matrix
     """
-    np.random.seed(seed)
     # input checking
     assert anc.shape == haplo.shape
     n_indiv = anc.shape[0]
