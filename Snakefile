@@ -1,7 +1,7 @@
 from os.path import join
 import os
 import yaml
-from experiment import single_snp_test
+import experiment
 import admix
 import itertools
 import numpy as np
@@ -17,18 +17,27 @@ GENO_PREFIX_LIST = [
     # "EUR_0.5_AFR_0.5_10_10000",
     "EUR_0.2_AFR_0.8_7_10000"
 ]
-PARAM_LIST = [param for param in itertools.product([0.05, 0.075, 0.1, 0.2], [0.8, 1.0])]
+# PARAM_LIST = [param for param in itertools.product([0.05, 0.075, 0.1, 0.2], [0.8, 1.0])]
+# PARAM_LIST.append((0.0, 0.0))
+
+PARAM_LIST = [param for param in itertools.product([0.02], [1.0])]
 PARAM_LIST.append((0.0, 0.0))
+
 
 rule all:
     input:
-        expand("out/single_snp_test/{geno_prefix}/{sim_param}/chunk_{chunk_i}.csv",
+        # expand("out/single_snp_test/{geno_prefix}/{sim_param}/chunk_{chunk_i}.csv",
+        #     geno_prefix=GENO_PREFIX_LIST,
+        #     sim_param=['_'.join([str(i) for i in p]) for p in PARAM_LIST], 
+        #     chunk_i=np.arange(config["N_TEST_CHUNK"])),
+        # expand("out/single_snp_test/{geno_prefix}/{sim_param}/summary.csv",
+        #     geno_prefix=GENO_PREFIX_LIST,
+        #     sim_param=['_'.join([str(i) for i in p]) for p in PARAM_LIST])
+        expand("out/finemap/{geno_prefix}/{sim_param}/chunk_{chunk_i}.csv",
             geno_prefix=GENO_PREFIX_LIST,
             sim_param=['_'.join([str(i) for i in p]) for p in PARAM_LIST], 
-            chunk_i=np.arange(config["N_TEST_CHUNK"])),
-        expand("out/single_snp_test/{geno_prefix}/{sim_param}/summary.csv",
-            geno_prefix=GENO_PREFIX_LIST,
-            sim_param=['_'.join([str(i) for i in p]) for p in PARAM_LIST])
+            chunk_i=np.arange(config["N_FINEMAP_CHUNK"])),
+
 
 rule format_data:
     resources:
@@ -87,7 +96,11 @@ rule single_snp_test:
         phgeno = phgeno[:, chunk_index]
         anc = anc[:, chunk_index]
         print(f"var_g: {wildcards.var_g}, cov: {wildcards.cov}")
-        rls = single_snp_test(phgeno=phgeno, anc=anc, theta=global_ancestry, var_g=float(wildcards.var_g), cov=float(wildcards.cov), seed=int(wildcards.chunk_i), n_sim=50)
+        rls = experiment.single_snp_test(phgeno=phgeno, 
+                                         anc=anc, 
+                                         theta=global_ancestry, 
+                                         var_g=float(wildcards.var_g), cov=float(wildcards.cov), 
+                                         seed=int(wildcards.chunk_i), n_sim=50)
 
         # save
         rls.to_csv(output[0], index=False)
@@ -95,8 +108,8 @@ rule single_snp_test:
 
 rule finemap:
     resources:
-        mem_gb=15,
-        time_min=8
+        mem_gb=8,
+        time_min=30
     input:
         anc = "data/geno/{geno_prefix}/anc.npy",
         phgeno = "data/geno/{geno_prefix}/phgeno.npy",
@@ -105,23 +118,27 @@ rule finemap:
         score= "out/finemap/{geno_prefix}/{var_g}_{cov}/chunk_{chunk_i}.csv",
         beta = "out/finemap/{geno_prefix}/{var_g}_{cov}/chunk_{chunk_i}.beta.npy",
     run:
-        import numpy as np
         # read phgeno, anc
         anc = np.load(input.anc)
         phgeno = np.load(input.phgeno)
+
         # calculating global ancestry
         global_ancestry = anc.reshape((anc.shape[0] // 2, anc.shape[1] * 2)).mean(axis=1)
         assert np.all(anc.shape == phgeno.shape)
 
         # seperate chunks
-        
         n_snp = anc.shape[1]
         chunk_index = np.array_split(np.arange(n_snp), config["N_FINEMAP_CHUNK"])[int(wildcards.chunk_i)]
         print(chunk_index)
         phgeno = phgeno[:, chunk_index]
         anc = anc[:, chunk_index]
+        print(phgeno.shape, anc.shape)
         print(f"var_g: {wildcards.var_g}, cov: {wildcards.cov}")
-        score_df, beta = finemap(phgeno=phgeno, anc=anc, theta=global_ancestry, var_g=float(wildcards.var_g), cov=float(wildcards.cov), seed=int(wildcards.chunk_i), n_sim=50)
+        score_df, beta = experiment.finemap(phgeno=phgeno, 
+                                            anc=anc, 
+                                            theta=global_ancestry, 
+                                            var_g=float(wildcards.var_g), cov=float(wildcards.cov), 
+                                            seed=int(wildcards.chunk_i), n_sim=10)
 
         # save
         score_df.to_csv(output.score, index=False)

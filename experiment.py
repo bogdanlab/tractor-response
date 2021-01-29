@@ -91,7 +91,7 @@ def finemap(phgeno, anc, theta, var_g, cov, n_sim=50, seed=1234, case_prevalence
     mix_anc = admix.add_up_haplotype(anc)
     mix_geno = admix.add_up_haplotype(phgeno)
     for sim_i in range(n_sim):
-        print('#', end='')
+        print(sim_i)
         sim_phe = phe[:, sim_i]
         # sample case control
         study_index = admix.sample_case_control(sim_phe)

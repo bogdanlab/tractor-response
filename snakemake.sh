@@ -13,9 +13,9 @@ snakemake \
     --snakefile Snakefile \
     --jobscript cluster_jobscript.sh \
     --cluster-sync "qsub -l h_data={resources.mem_gb}G,h_rt=00:{resources.time_min}:00,highp -o job_out" \
-    --jobs 150 \
+    --jobs 100 \
     --printshellcmds \
-    --max-jobs-per-second 1 \
-    --restart-times 2 \
-    --latency-wait 5 \
+    --max-jobs-per-second 0.3 \
+    --restart-times 5 \
+    --latency-wait 20 \
     --default-resources mem_gb=16 time_min=10
