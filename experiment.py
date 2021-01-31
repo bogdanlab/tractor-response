@@ -54,13 +54,19 @@ def single_snp_test_tractor(phgeno, anc, theta, odds_ratio, anc_effect, n_sim=50
                                               anc=mix_anc[study_index, :], 
                                               geno=mix_geno[study_index, :], 
                                               theta=theta[study_index])
+            # logistic regression results
             tractor_geno = admix.convert_anc_count(anc=anc[:, [snp_i, n_snp + snp_i]], phgeno=phgeno[:, [snp_i, n_snp + snp_i]])
-            score_df["TRACTOR"] = admix.tractor(pheno=mix_pheno[study_index],
-                                                anc=mix_anc[study_index, :], 
-                                                geno=tractor_geno[study_index, :], 
-                                                theta=theta[study_index])
+
+            logistic_rls = admix.tractor(pheno=mix_pheno[study_index],
+                                         anc=mix_anc[study_index, :], 
+                                         geno=tractor_geno[study_index, :], 
+                                         theta=theta[study_index])
+            for name in logistic_rls:
+                score_df[name] = logistic_rls[name]
+
             score_df["SIM_I"] = sim_i
             score_df["SNP_I"] = snp_i
+            print(score_df)
             score_df_list.append(score_df)
     return pd.concat(score_df_list)
 

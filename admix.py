@@ -70,6 +70,10 @@ def tractor(pheno, anc, geno, theta):
     A reimplementation for Tractor
         (base) admixture only;
         (tractor) admixture + the number of copies of the risk allele on a EUR background + the number of copies on an AFR background.
+
+        TEST1: y ~logit(localanc)
+        TEST2: y ~logit (genotypes)
+        TEST3: y ~logit (localanc + genotypes) , comparing to y~logit(localanc)
     Args
     -----
     pheno: (n_indiv, ) phenotypes
@@ -81,22 +85,34 @@ def tractor(pheno, anc, geno, theta):
     -----
     p-value
     """
-    base_design = np.hstack([sm.add_constant(anc), theta[:, np.newaxis]])
-    tractor_design = np.hstack([base_design, geno])
+    # local ancestry
+    m1_design = np.hstack([sm.add_constant(anc), theta[:, np.newaxis]])
+    m1_model = sm.Logit(pheno, m1_design).fit(disp=0, method="bfgs", maxiter=200)
+
+    # local ancestry + genotype (regardless of ancestry)
+    m2_design = np.hstack([m1_design, geno.mean(axis=1)[:, np.newaxis]])
+    m2_model = sm.Logit(pheno, m2_design).fit(disp=0, method="bfgs", maxiter=200,
+                                              start_params=np.concatenate([m1_model.params, [0.]]))
+
+    # local ancestry + genotype (ancestry aware)
+    m3_design = np.hstack([m1_design, geno])
+    m3_model = sm.Logit(pheno, m3_design).fit(disp=0, method="bfgs", maxiter=200,
+                                              start_params=np.concatenate([m1_model.params, [0., 0.]]))
+
     
-    # start with nm, then use bfgs
-    base_model = sm.Logit(pheno, base_design).fit(disp=0, method="nm", maxiter=200)
-    base_model = sm.Logit(pheno, base_design).fit(disp=0, method="bfgs", maxiter=200, start_params=base_model.params)
-    if not base_model.mle_retvals['converged']:
-        print("Warning: base_model not converged")
-    # use starting parameter from base_model
-    tractor_model = sm.Logit(pheno, tractor_design).fit(disp=0, method="bfgs", maxiter=200,
-                                                        start_params=np.concatenate([base_model.params, [0., 0.]]))
-    if not tractor_model.mle_retvals['converged']:
-        print("Warning: tractor_model not converged")
-    lr_stat = -2 * (base_model.llf - tractor_model.llf)
+    # genotype (regardless of ancestry)
+    att_design = np.hstack([sm.add_constant(geno.mean(axis=1)[:, np.newaxis]), theta[:, np.newaxis]])    
+    att_model = sm.Logit(pheno, att_design).fit(disp=0, method="bfgs", maxiter=200)
+
+    rls_dict = {
+        "ADM_LOGISTIC": m1_model.pvalues[1],
+        "ATT_LOGISTIC": att_model.pvalues[1],
+        "SNP1_LOGISTIC": stats.chi2.sf(-2 * (m1_model.llf - m2_model.llf), 1),
+        "TRACTOR": stats.chi2.sf(-2 * (m1_model.llf - m3_model.llf), 2)
+    }
     
-    return stats.chi2.sf(lr_stat, 2)
+    return rls_dict
+    
 
 def tractor_multi_snp(pheno, phgeno, anc, theta):
     """
@@ -552,4 +568,7 @@ def mixscore_wrapper(pheno, anc, geno, theta,
         rls_dict[name] = out
     tmp.cleanup()
     score_df = pd.DataFrame(rls_dict).apply(pd.to_numeric, errors='coerce')
+    # convert to p-value
+    for name in score_df.columns:
+        score_df[name] = stats.chi2.sf(score_df[name], df=(2 if name == "SUM" else 1))
     return score_df
