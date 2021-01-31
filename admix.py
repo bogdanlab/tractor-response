@@ -87,10 +87,13 @@ def tractor(pheno, anc, geno, theta):
     # start with nm, then use bfgs
     base_model = sm.Logit(pheno, base_design).fit(disp=0, method="nm", maxiter=200)
     base_model = sm.Logit(pheno, base_design).fit(disp=0, method="bfgs", maxiter=200, start_params=base_model.params)
-    
+    if not base_model.mle_retvals['converged']:
+        print("Warning: base_model not converged")
     # use starting parameter from base_model
     tractor_model = sm.Logit(pheno, tractor_design).fit(disp=0, method="bfgs", maxiter=200,
                                                         start_params=np.concatenate([base_model.params, [0., 0.]]))
+    if not tractor_model.mle_retvals['converged']:
+        print("Warning: tractor_model not converged")
     lr_stat = -2 * (base_model.llf - tractor_model.llf)
     
     return stats.chi2.sf(lr_stat, 2)
@@ -123,20 +126,20 @@ def tractor_multi_snp(pheno, phgeno, anc, theta):
     
     return pval_list
 
-def sample_case_control(pheno, ratio=1):
+def sample_case_control(pheno, control_ratio=1):
     """
     Sample case control from the population with a desired ratio
     Args
     -----
     pheno: (n_indiv, ) binary vector
-    ratio: the ratio between control and case
+    ratio: the ratio of control / case
     
     Returns
     -----
     index: (n_indiv, ) vector indicating whether i-th individual is sampled
     """
     case_index = np.where(pheno == 1)[0]
-    control_index = np.random.choice(np.where(pheno == 0)[0], size=int(len(case_index) * ratio), replace=False)
+    control_index = np.random.choice(np.where(pheno == 0)[0], size=int(len(case_index) * control_ratio), replace=False)
     study_index = np.sort(np.concatenate([case_index, control_index]))
     return study_index
 
@@ -320,6 +323,47 @@ def simulate_phenotype_cc(phgeno, anc, var_g, case_prevalence=0.1, n_causal=1, c
         phe[:, sim_i] = np.random.binomial(1, expit(intercept + phe_g[:, sim_i]))
         
     return beta, phe_g, phe
+
+def simulate_phenotype_cc_1snp_tractor(phgeno, anc, odds_ratio, theta, anc_effect, n_sim=10, case_prevalence=0.1):
+    """
+    Simulate case control phenotypes from phased genotype and ancestry (one SNP at a time)
+    This function is specifically to mimic how Tractor paper simulate, as follows:
+    In this model, the probability of disease was set to 
+    −2.19 + log[allelic risk effect size] × the number of copies of the minor allele coming from an AFR ancestral background + 
+        0.5 × AFR admixture proportion.
+    Args
+    -----
+    phgeno: phased genotype (n_indiv, 2 * n_snp)
+    anc: local ancestry (n_indiv, 2 * n_snp)
+    odds_ratio: odds ratio for the effect sizes, assumed to be the same across population
+    anc_effect: the effect sizes associated with global ancestry theta * anc_effect
+    Returns
+    -----
+    n_snp list of tuple (beta, phe_g, phe)
+    """
+    n_indiv = phgeno.shape[0]
+    n_snp = phgeno.shape[1] // 2
+    assert len(theta) == n_indiv
+    return_list = []
+    # simulate snp by snp
+    for snp_i in range(n_snp):
+        snp_phgeno = phgeno[:, [snp_i, snp_i + n_snp]]
+        snp_anc = anc[:, [snp_i, snp_i + n_snp]]
+        snp_geno = convert_anc_count(snp_phgeno, snp_anc)
+
+        # allelic risk effect size x number of minor alleles
+        snp_phe_g = np.dot(snp_geno, np.log(odds_ratio) * np.ones((2, n_sim)))
+        # anc_effect x global ancestry
+        snp_phe_g += np.dot(theta[:, np.newaxis], anc_effect * np.ones((1, n_sim)))
+        snp_phe = np.zeros_like(snp_phe_g, dtype=np.int8)
+        
+        for sim_i in range(n_sim):
+            # find an intercept, such that the expectation is case_prevalence.
+            func = lambda b : np.mean(expit(b + snp_phe_g[:, sim_i])) - case_prevalence
+            intercept = fsolve(func, logit(case_prevalence))
+            snp_phe[:, sim_i] = np.random.binomial(1, expit(intercept + snp_phe_g[:, sim_i]))
+        return_list.append((snp_phe_g, snp_phe))
+    return return_list
 
 def simulate_phenotype_cc_1snp(phgeno, anc, var_g, cov=0.0, n_sim=10, case_prevalence=0.1):
     """
