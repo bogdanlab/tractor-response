@@ -23,7 +23,7 @@ GENO_PREFIX_LIST = [
 # PARAM_LIST = [param for param in itertools.product([0.02], [1.0])]
 # PARAM_LIST.append((0.0, 0.0))
 
-PARAM_LIST = [param for param in itertools.product([1.15, 1.2, 1.25], [0.0])]
+PARAM_LIST = [param for param in itertools.product([1.0, 1.15, 1.2, 1.25], [0.0])]
 
 # PARAM_LIST = [param for param in itertools.product([0.02], [1.0])]
 # PARAM_LIST.append((0.0, 0.0))
@@ -31,17 +31,17 @@ PARAM_LIST = [param for param in itertools.product([1.15, 1.2, 1.25], [0.0])]
 
 rule all:
     input:
-        expand("out/single_snp_test_tractor/{geno_prefix}/{sim_param}/chunk_{chunk_i}.csv",
+        expand("out/single_snp_test_tractor/{geno_prefix}/0.1_1.0/{sim_param}/chunk_{chunk_i}.csv",
             geno_prefix=GENO_PREFIX_LIST,
             sim_param=['_'.join([str(i) for i in p]) for p in PARAM_LIST],
-            chunk_i=np.arange(50)),
+            chunk_i=np.arange(config["N_TEST_CHUNK"])),
         # expand("out/single_snp_test/{geno_prefix}/{sim_param}/chunk_{chunk_i}.csv",
         #     geno_prefix=GENO_PREFIX_LIST,
         #     sim_param=['_'.join([str(i) for i in p]) for p in PARAM_LIST], 
         #     chunk_i=np.arange(config["N_TEST_CHUNK"])),
-        # expand("out/single_snp_test/{geno_prefix}/{sim_param}/summary.csv",
-        #     geno_prefix=GENO_PREFIX_LIST,
-        #     sim_param=['_'.join([str(i) for i in p]) for p in PARAM_LIST])
+        expand("out/single_snp_test_tractor/{geno_prefix}/0.1_1.0/{sim_param}/summary.csv",
+            geno_prefix=GENO_PREFIX_LIST,
+            sim_param=['_'.join([str(i) for i in p]) for p in PARAM_LIST])
         # expand("out/finemap/{geno_prefix}/{sim_param}/chunk_{chunk_i}.csv",
         #     geno_prefix=GENO_PREFIX_LIST,
         #     sim_param=['_'.join([str(i) for i in p]) for p in PARAM_LIST], 
@@ -76,14 +76,14 @@ rule format_data:
 
 rule single_snp_test_tractor:
     resources:
-        mem_gb=8,
-        time_min=20
+        mem_gb=5,
+        time_min=25
     input:
         anc = "data/geno/{geno_prefix}/anc.npy",
         phgeno = "data/geno/{geno_prefix}/phgeno.npy",
         legend = "data/geno/{geno_prefix}/legend.csv"
     output:
-        "out/single_snp_test_tractor/{geno_prefix}/{odds_ratio}_{anc_effect}/chunk_{chunk_i}.csv"
+        "out/single_snp_test_tractor/{geno_prefix}/{case_prevalence}_{control_ratio}/{odds_ratio}_{anc_effect}/chunk_{chunk_i}.csv"
     run:
         import numpy as np
         # read phgeno, anc
@@ -100,13 +100,16 @@ rule single_snp_test_tractor:
         print(chunk_index)
         phgeno = phgeno[:, chunk_index]
         anc = anc[:, chunk_index]
+        print(f"case_prevalence: {wildcards.case_prevalence}, control_ratio: {wildcards.control_ratio}")
         print(f"odds_ratio: {wildcards.odds_ratio}, anc_effect: {wildcards.anc_effect}")
         rls = experiment.single_snp_test_tractor(phgeno=phgeno, 
-                                                 anc=anc, 
+                                                 anc=anc,
                                                  theta=global_ancestry, 
                                                  odds_ratio=float(wildcards.odds_ratio),
                                                  anc_effect=float(wildcards.anc_effect),
-                                                 seed=int(wildcards.chunk_i), n_sim=20, control_ratio=1.0)
+                                                 case_prevalence=float(wildcards.case_prevalence),
+                                                 control_ratio=float(wildcards.control_ratio),
+                                                 seed=int(wildcards.chunk_i), n_sim=20)
 
         # save
         rls.to_csv(output[0], index=False)
