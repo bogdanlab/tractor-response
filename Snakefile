@@ -16,16 +16,16 @@ GENO_PREFIX_LIST = [
     "EUR_0.2_AFR_0.8_7_80000"
 ]
 
-PARAM_LIST = [param for param in itertools.product([1.0, 1.15, 1.2, 1.25], [0.0])]
+PARAM_LIST = [param for param in itertools.product([1.0, 1.15, 1.2, 1.25], [0.0, 0.5])]
 
 rule all:
     input:
-        expand("out/single_snp_test_tractor/{geno_prefix}/{case_control_param}/{sim_param}/chunk_{chunk_i}.csv",
+        expand("out/single_snp_test_tractor/{geno_prefix}/{case_control_param}/{sim_param}/chunk_{chunk_i}.csv.gz",
             geno_prefix=GENO_PREFIX_LIST,
             case_control_param=["0.1_1.0", "0.1_2.5"],
             sim_param=['_'.join([str(i) for i in p]) for p in PARAM_LIST],
             chunk_i=np.arange(config["N_TEST_CHUNK"])),
-        expand("out/single_snp_test_tractor/{geno_prefix}/{case_control_param}/{sim_param}/summary.csv",
+        expand("out/single_snp_test_tractor/{geno_prefix}/{case_control_param}/{sim_param}/summary.csv.gz",
             geno_prefix=GENO_PREFIX_LIST,
             case_control_param=["0.1_1.0", "0.1_2.5"],
             sim_param=['_'.join([str(i) for i in p]) for p in PARAM_LIST])
@@ -65,7 +65,7 @@ rule single_snp_test_tractor:
         phgeno = "data/geno/{geno_prefix}/phgeno.npy",
         legend = "data/geno/{geno_prefix}/legend.csv"
     output:
-        "out/single_snp_test_tractor/{geno_prefix}/{case_prevalence}_{control_ratio}/{odds_ratio}_{anc_effect}/chunk_{chunk_i}.csv"
+        "out/single_snp_test_tractor/{geno_prefix}/{case_prevalence}_{control_ratio}/{odds_ratio}_{anc_effect}/chunk_{chunk_i}.csv.gz"
     run:
         import numpy as np
         # read phgeno, anc
@@ -101,10 +101,10 @@ rule single_snp_test_summary:
         mem_gb=8,
         time_min=10
     input:
-        expand("out/single_snp_test_tractor/{{prefix}}/chunk_{chunk_i}.csv",
+        expand("out/single_snp_test_tractor/{{prefix}}/chunk_{chunk_i}.csv.gz",
                 chunk_i=np.arange(config["N_TEST_CHUNK"])),
     output:
-        "out/single_snp_test_tractor/{prefix}/summary.csv"
+        "out/single_snp_test_tractor/{prefix}/summary.csv.gz"
     run:
         import numpy as np
         
