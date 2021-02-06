@@ -10,7 +10,7 @@ config = {
     "N_TEST_CHUNK": 100
 }
 
-RAW_DATA_DIR = "/u/project/pasaniuc/pasaniucdata/admixture/kangcheng/genotype_simulation/out/kg_3k"
+RAW_DATA_DIR = "raw_geno"
 
 GENO_PREFIX_LIST = [
     "EUR_0.2_AFR_0.8_7_80000"
@@ -118,46 +118,4 @@ rule single_snp_test_summary:
             rls_list.append(chunk_rls)
         print(f"total_n_snp: {total_n_snp}")
         pd.concat(rls_list).to_csv(output[0], index=False)
-
-
-
-# rule finemap:
-#     resources:
-#         mem_gb=8,
-#         time_min=30
-#     input:
-#         anc = "data/geno/{geno_prefix}/anc.npy",
-#         phgeno = "data/geno/{geno_prefix}/phgeno.npy",
-#         legend = "data/geno/{geno_prefix}/legend.csv"
-#     output:
-#         score= "out/finemap/{geno_prefix}/{var_g}_{cov}/chunk_{chunk_i}.csv",
-#         beta = "out/finemap/{geno_prefix}/{var_g}_{cov}/chunk_{chunk_i}.beta.npy",
-#     run:
-#         # read phgeno, anc
-#         anc = np.load(input.anc)
-#         phgeno = np.load(input.phgeno)
-
-#         # calculating global ancestry
-#         global_ancestry = anc.reshape((anc.shape[0] // 2, anc.shape[1] * 2)).mean(axis=1)
-#         assert np.all(anc.shape == phgeno.shape)
-
-#         # seperate chunks
-#         n_snp = anc.shape[1]
-#         chunk_index = np.array_split(np.arange(n_snp), config["N_FINEMAP_CHUNK"])[int(wildcards.chunk_i)]
-#         print(chunk_index)
-#         phgeno = phgeno[:, chunk_index]
-#         anc = anc[:, chunk_index]
-#         print(phgeno.shape, anc.shape)
-#         print(f"var_g: {wildcards.var_g}, cov: {wildcards.cov}")
-#         score_df, beta = experiment.finemap(phgeno=phgeno, 
-#                                             anc=anc, 
-#                                             theta=global_ancestry, 
-#                                             var_g=float(wildcards.var_g), cov=float(wildcards.cov), 
-#                                             seed=int(wildcards.chunk_i), n_sim=10)
-
-#         # save
-#         score_df.to_csv(output.score, index=False)
-#         np.save(output.beta, beta)
-
-
 
