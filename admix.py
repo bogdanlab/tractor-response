@@ -521,7 +521,7 @@ def deprecated_simulate_phenotype_admix(anc, haplo, h2g, n_causal, cov = 0., n_s
 
 def mixscore_wrapper(pheno, anc, geno, theta, 
                     scores=["ADM", "ATT", "MIX", "SNP1", "SUM"],
-                    mixscore_path="/u/project/pasaniuc/kangchen/tractor/software/mixscore-1.3/bin/mixscore",
+                    mixscore_path="./software/mixscore-1.3/bin/mixscore",
                     verbose=False):
     """
     A python wrapper for mixscore
