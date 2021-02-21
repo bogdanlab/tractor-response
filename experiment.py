@@ -212,6 +212,25 @@ def multi_snp_test(
 
     return pd.concat(score_df_list)
 
+# Example:
+"""
+root_dir=/u/project/pasaniuc/pasaniucdata/admixture/kangcheng/genotype_simulation/out/kg_3k/
+prefix=EUR_0.2_AFR_0.8_7_20000
+python format_data.py format_data \
+    --raw_dir ${root_dir}/${prefix} \
+    --legend ${root_dir}/legend.txt \
+    --out_dir data/geno/${prefix}
+"""
+
+def format_data(legend, raw_dir, out_dir):
+    os.makedirs(out_dir)
+    legend = pd.read_csv(legend, delim_whitespace=True)
+    ancestry = admix.read_int_mat(join(raw_dir, "admix.hanc"))
+    phgeno = admix.read_int_mat(join(raw_dir, "admix.phgeno")).T
+    np.save(join(out_dir, "anc.npy"), ancestry)
+    np.save(join(out_dir, "phgeno.npy"), phgeno)
+    legend.to_csv(join(out_dir, "legend.csv"), index=False)
+
 
 if __name__ == "__main__":
     fire.Fire()
