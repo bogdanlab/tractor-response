@@ -86,17 +86,22 @@ def tractor_multi_snp(pheno, phgeno, anc, theta):
     n_snp = phgeno.shape[1] // 2
     t_geno = convert_anc_count(anc=anc, phgeno=phgeno)
     t_anc = add_up_haplotype(anc)
-    pval_list = np.zeros(n_snp)
+    df = {
+        "ADM_LOGISTIC": [],
+        "ATT_LOGISTIC": [],
+        "SNP1_LOGISTIC": [],
+        "TRACTOR": [],
+    }
     for snp_i in range(n_snp):
-        pval = tractor(
+        pval_dict = tractor(
             pheno=pheno,
             anc=t_anc[:, snp_i],
             geno=t_geno[:, [snp_i, n_snp + snp_i]],
             theta=theta,
         )
-        pval_list[snp_i] = pval
-
-    return pval_list
+        for name in df:
+            df[name].append(pval_dict[name])
+    return pd.DataFrame(df)
 
 
 def sample_case_control(pheno, control_ratio=1):
