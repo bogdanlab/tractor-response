@@ -3,7 +3,7 @@ import numpy as np
 from os.path import join
 import fire
 import admix
-
+import os
 
 def single_snp_test_tractor(
     phgeno,
@@ -214,12 +214,12 @@ def multi_snp_test(
 
 # Example:
 """
-root_dir=/u/project/pasaniuc/pasaniucdata/admixture/kangcheng/genotype_simulation/out/kg_3k/
-prefix=EUR_0.2_AFR_0.8_7_20000
-python format_data.py format_data \
+root_dir=/u/project/pasaniuc/pasaniucdata/admixture/kangcheng/genotype_simulation/out/finemap_typed_300/
+prefix=EUR_0.2_AFR_0.8_7_80000
+python experiment.py format_data \
     --raw_dir ${root_dir}/${prefix} \
     --legend ${root_dir}/legend.txt \
-    --out_dir data/geno/${prefix}
+    --out_dir data/geno/finemap_typed_300
 """
 
 def format_data(legend, raw_dir, out_dir):
