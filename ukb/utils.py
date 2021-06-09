@@ -72,16 +72,19 @@ def marginal(ds: xr.Dataset, col_pheno: str, col_cov: List[str] = None, method: 
         pvalues = np.array(pvalues)
     
     elif method == "TRACTOR":
+        # number of african alleles
         lanc = np.sum(ds["lanc"].data, axis=2)
+        # alleles per ancestry
         allele_per_anc = admix.data.compute_allele_per_anc(ds).compute()
         
         pvalues = []
         for i_snp in tqdm(range(n_snp)):
-            
+            # number of african alleles, covariates
             design_null = np.hstack(
                 [sm.add_constant(lanc[:, i_snp][:, np.newaxis]), cov]
             )
             model_null = sm.GLM(pheno[mask_indiv], design_null[mask_indiv, :], family=sm.families.Gaussian()).fit()
+            # number of african alleles, covariates + allele-per-anc
             design_alt = np.hstack([design_null, allele_per_anc[:, i_snp, :]])
             model_alt = sm.GLM(pheno[mask_indiv], design_alt[mask_indiv, :], family=sm.families.Gaussian()).fit(
                 start_params=np.concatenate([model_null.params, [0.0, 0.0]])
