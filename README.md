@@ -7,6 +7,9 @@ https://nbviewer.jupyter.org/github/bogdanlab/tractor-response/blob/main/simulat
 3. extended results of power.
 4. association testing when the causal SNP is not typed
 
-See [real data study](https://nbviewer.jupyter.org/github/bogdanlab/tractor-response/blob/main/ukb/04_assoc.ipynb) for Manhattan plots of known risk reigons for lipids traits.
+See [real data study](https://nbviewer.jupyter.org/github/bogdanlab/tractor-response/blob/main/ukb/04_assoc.ipynb) 
+for analyses of known risk reigons (LDLR, APOE, PCSK9, SORT1) for lipids traits (LDL, TC) in 4,327 individuals
+with European and African ancestries.
+
 
 See directory [simulation](simulation), [ukb](ukb) for details of simulation and real data analysis.

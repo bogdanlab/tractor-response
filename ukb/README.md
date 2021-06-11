@@ -10,6 +10,11 @@ population EUR, AFR, EAS, SAS, as ancestral population. We select individuals ba
 (EUR > 0.05) & (AFR > 0.05) & (EAS < 0.05) & (SAS < 0.05). This yields 4327 individuals 
 as admixed population in this study. See `00_data.ipynb` notebook for details.
 
+![PCA for individuals in UK Biobank](ukb_pca.png)
+
+*Purple points were selected as admixed individuals with European and African ancestries*
+
+
 ## Genotype processing
 With the subset of admixed individuals, we filter for hwe < 1e-6, MAF > 0.01, 
 genotype missing rate < 0.05 to select SNPs, using the following comamand.
